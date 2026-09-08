@@ -1,0 +1,28 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    var bizName = Configuration["Business:Name"] ?? "Local Pork Delivery";
+    var phone = Configuration["Business:Phone"] ?? "";
+    var whatsapp = Configuration["Business:WhatsApp"] ?? "";
+    var hours = Configuration["Business:Hours"] ?? "";
+    var serviceArea = Configuration["Business:ServiceArea"] ?? "";
+}
+<footer class="site-footer">
+    <div class="container">
+        <div class="row gy-3">
+            <div class="col-md-4">
+                <div class="footer-brand mb-2">@bizName</div>
+                <p class="mb-0">Freshly arranged after you order, hygienically packed, delivered locally.</p>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-1">📞 <a href="tel:@phone">@phone</a></div>
+                <div class="mb-1">💬 <a href="https://wa.me/@whatsapp" target="_blank" rel="noopener">WhatsApp Us</a></div>
+                <div>🕒 @hours</div>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-1">📍 @serviceArea</div>
+            </div>
+        </div>
+        <hr class="border-secondary mt-4 mb-3" />
+        <div class="text-center small">&copy; @DateTime.Now.Year @bizName. All rights reserved.</div>
+    </div>
+</footer>

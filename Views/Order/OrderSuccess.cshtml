@@ -1,0 +1,45 @@
+@model Order
+@{
+    ViewData["Title"] = "Order Placed";
+    var shopWhatsApp = System.Text.RegularExpressions.Regex.Replace(ViewBag.ShopWhatsApp as string ?? string.Empty, @"[^\d]", "");
+    var orderItems = string.Join("; ", Model.OrderItems.Select(item => $"{item.ProductNameSnapshot} x {item.Quantity:0.##} KG"));
+    var whatsappMessage = $"New order {Model.OrderNumber}\n" +
+        $"Customer: {Model.CustomerName}\n" +
+        $"Phone: {Model.ContactPhone}\n" +
+        $"Address: {Model.DeliveryAddress}, near {Model.Landmark}\n" +
+        $"Items: {orderItems}\n" +
+        $"Total: Rs. {Model.TotalAmount:N2}\n" +
+        "Payment: Cash on Delivery";
+    var whatsappUrl = $"https://wa.me/{shopWhatsApp}?text={Uri.EscapeDataString(whatsappMessage)}";
+}
+
+<div class="text-center mb-4">
+    <div style="font-size:3rem;">✅</div>
+    <h2 class="text-success mb-2">Your order has been placed successfully!</h2>
+    <p class="text-muted">Payment: Cash on Delivery</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <partial name="_OrderStatusCard" model="Model" />
+
+        <div class="alert alert-secondary mt-3">
+            Your order details and live status are available in
+            <a asp-controller="Order" asp-action="MyOrders">My Orders</a> on this device.
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(shopWhatsApp))
+        {
+            <div class="text-center mt-3">
+                <a class="btn btn-success" href="@whatsappUrl" target="_blank" rel="noopener">
+                    💬 Notify Shop on WhatsApp
+                </a>
+                <p class="small text-muted mt-2 mb-0">Send your order details to the shop for quick confirmation.</p>
+            </div>
+        }
+    </div>
+</div>
+
+<div class="text-center mt-3">
+    <a class="btn btn-success" asp-controller="Home" asp-action="Index">Continue Shopping</a>
+</div>

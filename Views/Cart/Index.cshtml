@@ -1,0 +1,241 @@
+@model List<CartItem>
+@{
+    ViewData["Title"] = "Cart";
+}
+
+<span class="eyebrow">Your Order</span>
+<h2 class="mb-4">Cart</h2>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-warning">@TempData["Error"]</div>
+}
+
+@if (!Model.Any())
+{
+    <div class="info-section text-center">
+        <p class="mb-3">Your cart is empty.</p>
+        <a class="btn btn-success" asp-controller="Home" asp-action="Index">Continue Shopping</a>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Price / KG</th>
+                    <th>Quantity (KG)</th>
+                    <th>Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr data-cart-row="@item.Id">
+                        <td>@item.Product?.Name</td>
+                        <td>Rs. @item.Product?.PricePerKg</td>
+                        <td style="width:150px">
+                            <form asp-controller="Cart" asp-action="UpdateQuantity" method="post" class="d-flex gap-1 js-cart-update">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="cartItemId" value="@item.Id" />
+                                <input type="number" name="quantity" value="@item.Quantity" min="0.25" max="50" step="0.25" class="form-control form-control-sm" />
+                                <span class="cart-quantity-error text-danger small d-none">Minimum 0.25 KG required</span>
+                                <span class="cart-quantity-state text-muted small" aria-live="polite"></span>
+                                <button type="submit" class="btn btn-sm btn-outline-secondary d-none" aria-hidden="true" tabindex="-1">↻</button>
+                            </form>
+                        </td>
+                        <td class="fw-semibold cart-item-subtotal">Rs. @(item.Product != null ? item.Product.PricePerKg * item.Quantity : 0)</td>
+                        <td>
+                            <form asp-controller="Cart" asp-action="Remove" method="post" class="js-cart-remove">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="cartItemId" value="@item.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="info-section d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <h4 class="mb-0">Total: <span id="cart-total" class="price-tag">Rs. @ViewBag.Total</span></h4>
+        <a id="checkout-button" class="btn btn-success btn-lg" asp-controller="Order" asp-action="Checkout" aria-disabled="false">Proceed to Checkout</a>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const ajaxSubmit = async (form, callback) => {
+                const formData = new FormData(form);
+                const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                    },
+                    body: new URLSearchParams(formData).toString()
+                });
+
+                const data = await response.json();
+                if (callback) {
+                    callback(data, form);
+                }
+            };
+
+            const updateTimers = new WeakMap();
+            const rowStates = new WeakMap();
+            const checkoutButton = document.getElementById('checkout-button');
+            const isValidQuantity = (value) => {
+                const quantity = Number(value);
+                return Number.isFinite(quantity) && quantity >= 0.25 && quantity <= 50 && quantity % 0.25 === 0;
+            };
+
+            const showQuantityValidation = (form, message) => {
+                const error = form.querySelector('.cart-quantity-error');
+                if (!error) return;
+                error.textContent = message || '';
+                error.classList.toggle('d-none', !message);
+            };
+
+            const updateCheckoutState = () => {
+                let blocked = false;
+                document.querySelectorAll('.js-cart-update').forEach(form => {
+                    const state = rowStates.get(form);
+                    if (state && state !== 'saved') blocked = true;
+                });
+                if (!checkoutButton) return;
+                checkoutButton.classList.toggle('disabled', blocked);
+                checkoutButton.setAttribute('aria-disabled', blocked ? 'true' : 'false');
+                checkoutButton.title = blocked ? 'Please wait for quantity changes to finish saving.' : '';
+            };
+
+            const setRowState = (form, state, message) => {
+                rowStates.set(form, state);
+                const stateLabel = form.querySelector('.cart-quantity-state');
+                if (stateLabel) {
+                    stateLabel.textContent = message || (state === 'saving' ? 'Saving...' : state === 'saved' ? 'Saved' : '');
+                    stateLabel.className = 'cart-quantity-state small ' + (state === 'saving' ? 'text-muted' : state === 'saved' ? 'text-success' : 'text-danger');
+                }
+                updateCheckoutState();
+            };
+
+            const saveQuantity = async (form) => {
+                const quantityInput = form.querySelector('input[name="quantity"]');
+                const state = rowStates.get(form);
+                const quantityAtSave = quantityInput?.value;
+                if (!quantityInput || !isValidQuantity(quantityAtSave) || state === 'saving') return;
+
+                setRowState(form, 'saving');
+                try {
+                    await ajaxSubmit(form, function (data, currentForm) {
+                        if (data.success) {
+                            const subtotalCell = currentForm.closest('tr').querySelector('.cart-item-subtotal');
+                            const totalLabel = document.getElementById('cart-total');
+                            if (subtotalCell) subtotalCell.textContent = 'Rs. ' + Number(data.itemSubtotal).toFixed(2);
+                            if (totalLabel) totalLabel.textContent = 'Rs. ' + Number(data.total).toFixed(2);
+                        } else {
+                            throw new Error(data.message || 'Unable to save this quantity.');
+                        }
+                    });
+
+                    if (quantityInput.value === quantityAtSave) {
+                        quantityInput.value = Number(quantityAtSave).toString();
+                        form.dataset.lastSavedQuantity = quantityInput.value;
+                        setRowState(form, 'saved');
+                        showQuantityValidation(form, '');
+                    } else {
+                        setRowState(form, 'dirty', 'Saving latest change...');
+                        updateTimers.set(form, window.setTimeout(() => saveQuantity(form), 500));
+                    }
+                } catch (error) {
+                    if (quantityInput.value === quantityAtSave) {
+                        quantityInput.value = form.dataset.lastSavedQuantity;
+                        setRowState(form, 'saved');
+                    } else {
+                        setRowState(form, 'dirty', 'Change not saved');
+                        updateTimers.set(form, window.setTimeout(() => saveQuantity(form), 500));
+                    }
+                    alert(error.message || 'Unable to save this quantity.');
+                }
+            };
+
+            const removeItem = async (form) => {
+                await ajaxSubmit(form, function (data, currentForm) {
+                    if (!data.success) throw new Error(data.message || 'Unable to remove this item.');
+                    const row = currentForm.closest('tr');
+                    if (row) row.remove();
+                    const totalLabel = document.getElementById('cart-total');
+                    if (totalLabel) totalLabel.textContent = 'Rs. ' + Number(data.total).toFixed(2);
+                    if (data.itemCount === 0) window.location.reload();
+                });
+            };
+
+            document.querySelectorAll('.js-cart-update').forEach(form => {
+                const quantityInput = form.querySelector('input[name="quantity"]');
+                const removeForm = form.closest('tr')?.querySelector('.js-cart-remove');
+                form.dataset.lastSavedQuantity = quantityInput?.value || '';
+                setRowState(form, 'saved');
+                quantityInput?.addEventListener('input', function () {
+                    window.clearTimeout(updateTimers.get(form));
+                    const quantity = Number(quantityInput.value);
+                    if (quantity === 0) {
+                        showQuantityValidation(form, 'Use Remove to remove this item.');
+                        setRowState(form, 'invalid');
+                        if (window.confirm('Remove this item?')) {
+                            removeForm?.requestSubmit();
+                        } else {
+                            quantityInput.value = form.dataset.lastSavedQuantity;
+                            showQuantityValidation(form, '');
+                            setRowState(form, 'saved');
+                        }
+                        return;
+                    }
+
+                    const valid = isValidQuantity(quantityInput.value);
+                    showQuantityValidation(form, valid ? '' : 'Minimum 0.25 KG required');
+                    setRowState(form, valid ? 'dirty' : 'invalid');
+                    if (valid) {
+                        updateTimers.set(form, window.setTimeout(() => saveQuantity(form), 500));
+                    }
+                });
+
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    window.clearTimeout(updateTimers.get(form));
+                    if (isValidQuantity(quantityInput?.value)) {
+                        showQuantityValidation(form, '');
+                        await saveQuantity(form);
+                    } else {
+                        showQuantityValidation(form, 'Minimum 0.25 KG required');
+                        setRowState(form, 'invalid');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.js-cart-remove').forEach(form => {
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    try {
+                        await removeItem(form);
+                    } catch (error) {
+                        alert(error.message || 'Unable to remove this item.');
+                    }
+                });
+            });
+
+            checkoutButton?.addEventListener('click', function (event) {
+                if (checkoutButton.getAttribute('aria-disabled') === 'true') {
+                    event.preventDefault();
+                }
+            });
+        });
+    </script>
+}

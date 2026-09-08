@@ -1,0 +1,64 @@
+@model Product
+@{
+    ViewData["Title"] = Model.Name;
+}
+
+<div class="row">
+    <div class="col-md-5">
+        @if (!string.IsNullOrEmpty(Model.ImageUrl))
+        {
+            <img src="@Model.ImageUrl" class="img-fluid rounded" alt="@Model.Name" />
+        }
+        else
+        {
+            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height:280px;">
+                <span class="text-muted">🥩</span>
+            </div>
+        }
+    </div>
+    <div class="col-md-7">
+        <span class="eyebrow">@Model.Category?.Name</span>
+        <h2>@Model.Name</h2>
+        <div class="price-tag mb-2">Rs. @Model.PricePerKg <span class="small text-muted fw-normal">/ KG</span></div>
+        <p>@Model.Description</p>
+
+        @if (Model.IsAvailable)
+        {
+            <span class="available-badge mb-3">Available on Order</span>
+            <form asp-controller="Cart" asp-action="Add" method="post" class="d-flex gap-2 align-items-center mt-3 flex-wrap js-add-to-cart">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="productId" value="@Model.Id" />
+                <label class="mb-0">Quantity (KG)</label>
+                <input type="number" name="quantity" value="1" min="0.25" step="0.25" class="form-control" style="width:110px" />
+                <span id="quantity-estimate" class="small text-muted">Estimated: Rs. @Model.PricePerKg.ToString("0.00")</span>
+                <button type="submit" class="btn btn-success">Add to Cart</button>
+            </form>
+        }
+        else
+        {
+            <span class="badge bg-danger">Currently Unavailable</span>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const quantityInput = document.querySelector('input[name="quantity"]');
+            const estimate = document.getElementById('quantity-estimate');
+            const pricePerKg = @Model.PricePerKg.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            if (!quantityInput || !estimate) return;
+
+            quantityInput.addEventListener('input', function () {
+                const quantity = Number(quantityInput.value);
+                const isValidQuantity = Number.isFinite(quantity) && quantity >= 0.25 && quantity <= 50 && quantity % 0.25 === 0;
+                estimate.classList.toggle('text-danger', !isValidQuantity);
+                estimate.classList.toggle('text-muted', isValidQuantity);
+                estimate.textContent = isValidQuantity
+                    ? 'Estimated: Rs. ' + (pricePerKg * quantity).toFixed(2)
+                    : 'Minimum 0.25 KG required';
+            });
+        });
+    </script>
+}

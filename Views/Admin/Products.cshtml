@@ -1,0 +1,68 @@
+@model List<Product>
+@{
+    ViewData["Title"] = "Manage Products";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between mb-4">
+    <h2>Products</h2>
+    <a class="btn btn-primary" asp-action="ProductCreate">+ Add Product</a>
+</div>
+
+<table class="table">
+    <thead>
+        <tr><th>Name</th><th>Category</th><th>Price / KG</th><th>Available</th><th></th></tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Model)
+        {
+            <tr>
+                <td>@p.Name</td>
+                <td>@p.Category?.Name</td>
+                <td>Rs. @p.PricePerKg</td>
+                <td class="product-availability" id="product-status-@p.Id">@(p.IsAvailable ? "Yes" : "No")</td>
+                <td>
+                    <form asp-action="ToggleProductAvailability" asp-route-id="@p.Id" method="post" class="d-inline js-toggle-product-availability">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-primary">@(p.IsAvailable ? "Hide" : "Show")</button>
+                    </form>
+                    <a class="btn btn-sm btn-outline-secondary" asp-action="ProductEdit" asp-route-id="@p.Id">Edit</a>
+                    <form asp-action="ProductDelete" asp-route-id="@p.Id" method="post" class="d-inline" onsubmit="return confirm('Remove this product?');">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.js-toggle-product-availability').forEach(form => {
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        headers: {
+                            'RequestVerificationToken': token,
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json();
+                    if (!data.success) return;
+
+                    const cell = form.closest('tr').querySelector('.product-availability');
+                    if (cell) cell.textContent = data.label;
+
+                    const button = form.querySelector('button');
+                    if (button) button.textContent = data.isAvailable ? 'Hide' : 'Show';
+                });
+            });
+        });
+    </script>
+}

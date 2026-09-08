@@ -1,0 +1,184 @@
+@model List<Order>
+@{
+    ViewData["Title"] = "My Orders";
+    var activeOrderIds = Model
+        .Where(order => !OrderStatusValidator.IsTerminalStatus(order.Status))
+        .Select(order => order.Id)
+        .ToList();
+}
+
+<span class="eyebrow">Same Device History</span>
+<h2 class="mb-2">My Orders</h2>
+<p class="text-muted mb-4">Your complete order history from this browser.</p>
+
+@if (!Model.Any())
+{
+    <div class="info-section">
+        <p class="mb-0">No saved orders found on this device yet.</p>
+    </div>
+}
+else
+{
+    <div id="my-orders-list" data-active-order-ids="@string.Join(',', activeOrderIds)">
+        @foreach (var order in Model)
+        {
+            <article class="info-section my-order-card" data-order-id="@order.Id">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                    <div>
+                        <h5 class="mb-1">Order placed</h5>
+                        <div class="text-muted small">@order.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</div>
+                    </div>
+                    <span class="status-badge status-@order.Status.ToString().ToLowerInvariant()" data-status-badge>@(order.Status == OrderStatus.NewOrder ? "New Order" : order.Status.ToString())</span>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <h6 class="text-uppercase text-muted small fw-semibold">Items</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Product</th><th>Qty</th><th class="text-end">Price</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in order.OrderItems)
+                                    {
+                                        <tr>
+                                            <td>@item.ProductNameSnapshot</td>
+                                            <td>@item.Quantity.ToString("0.##") KG</td>
+                                            <td class="text-end">Rs. @item.TotalPrice.ToString("N2")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <h6 class="text-uppercase text-muted small fw-semibold">Delivery</h6>
+                        <p class="mb-1"><strong>@order.CustomerName</strong></p>
+                        <p class="mb-1">@order.DeliveryAddress</p>
+                        <p class="mb-1 text-muted">Near @order.Landmark · @order.DeliveryZoneName</p>
+                        @if (!string.IsNullOrWhiteSpace(order.DeliveryInstructions))
+                        {
+                            <p class="small text-muted mb-0">Note: @order.DeliveryInstructions</p>
+                        }
+                    </div>
+                </div>
+
+                <div class="row g-4 mt-1">
+                    <div class="col-lg-7">
+                        <h6 class="text-uppercase text-muted small fw-semibold">Order progress</h6>
+                        <div class="order-cancelled-state alert alert-danger mb-0 @(order.Status == OrderStatus.Cancelled ? "" : "d-none")" data-cancelled-state>This order was cancelled.</div>
+                        <div class="order-progress-content @(order.Status == OrderStatus.Cancelled ? "d-none" : "")" data-progress-content>
+                            <div class="order-progress-summary">
+                                <span class="small text-muted">Current status</span>
+                                <strong data-current-status>@(order.Status == OrderStatus.NewOrder ? "New Order" : order.Status.ToString())</strong>
+                            </div>
+                            <div class="order-timeline" data-order-progress>
+                                <span class="order-timeline-track"></span>
+                                <span class="order-timeline-fill" data-progress-fill style="width: @((int)order.Status == (int)OrderStatus.NewOrder ? 0 : (int)order.Status == (int)OrderStatus.Accepted ? 33.3333 : 66.6667)%"></span>
+                                @foreach (var step in new[] { OrderStatus.NewOrder, OrderStatus.Accepted, OrderStatus.Delivered })
+                                {
+                                    var isComplete = (int)order.Status >= (int)step;
+                                    var isCurrent = order.Status == step;
+                                    <div class="order-timeline-step @(isComplete ? "is-complete" : "") @(isCurrent ? "is-current" : "")" data-status-step="@step">
+                                        <span class="order-timeline-node">
+                                            <span class="order-timeline-icon">@(step == OrderStatus.NewOrder ? "!" : step == OrderStatus.Accepted ? "✓" : "▣")</span>
+                                        </span>
+                                        <strong>@(step == OrderStatus.NewOrder ? "New Order" : step.ToString())</strong>
+                                        <small>@(step == OrderStatus.NewOrder ? "Order received" : step == OrderStatus.Accepted ? "Being prepared" : "On the way to you")</small>
+                                        <span class="order-current-pill" data-current-pill>Current status</span>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5">
+                        <h6 class="text-uppercase text-muted small fw-semibold">Payment summary</h6>
+                        <div class="d-flex justify-content-between"><span>Items</span><span>Rs. @order.SubTotal.ToString("N2")</span></div>
+                        <div class="d-flex justify-content-between"><span>Delivery</span><span>Rs. @order.DeliveryCharge.ToString("N2")</span></div>
+                        <hr class="my-2" />
+                        <div class="d-flex justify-content-between"><strong>Total</strong><strong>Rs. @order.TotalAmount.ToString("N2")</strong></div>
+                        <div class="small text-muted mt-2">@order.PaymentMethod · @order.PaymentStatus</div>
+                    </div>
+                </div>
+            </article>
+        }
+    </div>
+}
+
+@if (activeOrderIds.Count > 0)
+{
+    @section Scripts {
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const ordersList = document.getElementById('my-orders-list');
+                let activeOrderIds = new Set((ordersList.dataset.activeOrderIds || '').split(',').filter(Boolean));
+                let pollTimer;
+
+                const statusSteps = ['NewOrder', 'Accepted', 'Delivered'];
+
+                const formatStatus = (status) => status === 'NewOrder' ? 'New Order' : status;
+                const getProgress = (status) => {
+                    const index = statusSteps.indexOf(status);
+                    return index < 0 ? 0 : index * 33.3333;
+                };
+
+                const updateOrderProgress = (card, status) => {
+                    const badge = card.querySelector('[data-status-badge]');
+                    if (badge) {
+                        badge.textContent = formatStatus(status);
+                        badge.className = 'status-badge status-' + status.toLowerCase();
+                    }
+
+                    const currentStepIndex = statusSteps.indexOf(status);
+                    const currentStatus = card.querySelector('[data-current-status]');
+                    const progressFill = card.querySelector('[data-progress-fill]');
+                    const progressContent = card.querySelector('[data-progress-content]');
+                    const cancelledState = card.querySelector('[data-cancelled-state]');
+                    const isCancelled = status === 'Cancelled';
+                    if (currentStatus) currentStatus.textContent = formatStatus(status);
+                    if (progressFill) progressFill.style.width = getProgress(status) + '%';
+                    if (progressContent) progressContent.classList.toggle('d-none', isCancelled);
+                    if (cancelledState) cancelledState.classList.toggle('d-none', !isCancelled);
+
+                    card.querySelectorAll('[data-status-step]').forEach(step => {
+                        const stepIndex = statusSteps.indexOf(step.dataset.statusStep);
+                        step.classList.toggle('is-complete', stepIndex >= 0 && stepIndex <= currentStepIndex);
+                        step.classList.toggle('is-current', step.dataset.statusStep === status);
+                        const currentPill = step.querySelector('[data-current-pill]');
+                        if (currentPill) currentPill.textContent = step.dataset.statusStep === status ? 'Current status' : '';
+                    });
+                };
+
+                const pollStatuses = async () => {
+                    try {
+                        const response = await fetch('@Url.Action("MyOrdersStatus", "Order")', {
+                            headers: { 'Accept': 'application/json' },
+                            cache: 'no-store'
+                        });
+                        if (!response.ok) return;
+
+                        const data = await response.json();
+                        const returnedIds = new Set();
+                        data.orders.forEach(order => {
+                            const id = String(order.id);
+                            const card = document.querySelector(`[data-order-id="${id}"]`);
+                            if (card) updateOrderProgress(card, order.status);
+                            if (!order.isTerminal) returnedIds.add(id);
+                        });
+                        activeOrderIds = returnedIds;
+
+                        if (activeOrderIds.size === 0) {
+                            window.clearInterval(pollTimer);
+                        }
+                    } catch (error) {
+                        // A temporary status refresh failure should not disturb the order list.
+                    }
+                };
+
+                pollStatuses();
+                pollTimer = window.setInterval(pollStatuses, 18000);
+            });
+        </script>
+    }
+}

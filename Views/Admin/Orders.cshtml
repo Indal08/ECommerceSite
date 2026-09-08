@@ -1,0 +1,144 @@
+@model List<Order>
+@{
+    ViewData["Title"] = "Orders";
+    Layout = "_AdminLayout";
+    var selectedStatus = ViewBag.SelectedStatus as OrderStatus?;
+}
+
+@{
+    var searchTerm = ViewBag.SearchTerm as string ?? string.Empty;
+    var totalOrders = ViewBag.TotalOrders is int count ? count : Model.Count;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <div class="eyebrow">Orders</div>
+        <h2 class="mb-0">Order Queue</h2>
+    </div>
+    <div class="text-muted small">@totalOrders total</div>
+</div>
+
+<div id="new-order-alert" class="alert alert-warning d-none align-items-center justify-content-between gap-3 flex-wrap" role="status" aria-live="polite">
+    <strong id="new-order-alert-text">🔔 New orders received</strong>
+    <a asp-action="Orders" asp-route-status="NewOrder" class="alert-link">Review new orders</a>
+</div>
+
+<form asp-action="Orders" method="get" class="admin-filter-bar mb-4">
+    <div class="input-group">
+        <input type="text" name="searchTerm" class="form-control" value="@searchTerm" placeholder="Search by order, name, phone or address" />
+        <button type="submit" class="btn btn-primary">Search</button>
+        @if (!string.IsNullOrWhiteSpace(searchTerm) || selectedStatus.HasValue)
+        {
+            <a asp-action="Orders" class="btn btn-outline-secondary">Clear</a>
+        }
+    </div>
+</form>
+
+<div class="mb-3 d-flex gap-2 flex-wrap">
+    <a class="btn btn-sm @(selectedStatus == null ? "btn-primary" : "btn-outline-primary")" asp-action="Orders" asp-route-searchTerm="@searchTerm">All</a>
+    @foreach (var status in Enum.GetValues<OrderStatus>())
+    {
+        <a class="btn btn-sm @(selectedStatus == status ? "btn-primary" : "btn-outline-primary")" asp-action="Orders" asp-route-status="@status" asp-route-searchTerm="@searchTerm">@status</a>
+    }
+</div>
+
+@if (!Model.Any())
+{
+    <div class="admin-panel-card text-center py-4">
+        <p class="mb-0 text-muted">No orders found for this filter.</p>
+    </div>
+}
+
+else
+{
+    <div class="admin-panel-card p-0 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table admin-order-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Phone</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in Model)
+                    {
+                        <tr class="@(order.Status == OrderStatus.NewOrder ? "table-warning" : "")">
+                            <td>@order.OrderNumber</td>
+                            <td>@order.CustomerName</td>
+                            <td>@order.ContactPhone</td>
+                            <td>@order.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</td>
+                            <td>Rs. @order.TotalAmount</td>
+                            <td><span class="status-badge status-@order.Status.ToString().ToLowerInvariant()">@order.Status</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="OrderDetails" asp-route-id="@order.Id">View</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+
+
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const alertBox = document.getElementById('new-order-alert');
+            const alertText = document.getElementById('new-order-alert-text');
+            let latestKnownOrderId = null;
+
+            const playBeep = () => {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    oscillator.frequency.value = 740;
+                    gain.gain.value = 0.05;
+                    oscillator.connect(gain);
+                    gain.connect(audioContext.destination);
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.16);
+                } catch (error) {
+                    // Browsers may block audio until the admin interacts with the page.
+                }
+            };
+
+            const pollForNewOrders = async () => {
+                try {
+                    const response = await fetch('@Url.Action("NewOrderCount", "Admin")', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                        cache: 'no-store'
+                    });
+                    if (!response.ok) return;
+
+                    const data = await response.json();
+                    if (data.count > 0) {
+                        alertText.textContent = `🔔 ${data.count} New Order${data.count === 1 ? '' : 's'}`;
+                        alertBox.classList.remove('d-none');
+                        alertBox.classList.add('d-flex');
+                    } else {
+                        alertBox.classList.add('d-none');
+                        alertBox.classList.remove('d-flex');
+                    }
+
+                    if (latestKnownOrderId !== null && data.latestOrderId > latestKnownOrderId) {
+                        playBeep();
+                    }
+                    latestKnownOrderId = data.latestOrderId;
+                } catch (error) {
+                    // A temporary polling failure should not interrupt order management.
+                }
+            };
+
+            pollForNewOrders();
+            window.setInterval(pollForNewOrders, 25000);
+        });
+    </script>
+}

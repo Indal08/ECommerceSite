@@ -1,0 +1,42 @@
+@model List<Category>
+@{
+    ViewData["Title"] = "Categories";
+    Layout = "_AdminLayout";
+}
+
+<h2 class="mb-4">Categories</h2>
+
+<form asp-action="CategoryCreate" method="post" class="d-flex gap-2 mb-4" style="max-width:400px">
+    @Html.AntiForgeryToken()
+    <input type="text" name="name" class="form-control" placeholder="New category name" required />
+    <button type="submit" class="btn btn-primary">Add</button>
+</form>
+
+<table class="table" style="max-width:600px">
+    <thead><tr><th>Name</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+        @foreach (var c in Model)
+        {
+            <tr>
+                <td>@c.Name</td>
+                <td>@(c.IsActive ? "Active" : "Inactive")</td>
+                <td>
+                    @if (c.IsActive)
+                    {
+                        <form asp-action="CategoryDelete" asp-route-id="@c.Id" method="post" class="d-inline" onsubmit="return confirm('Remove or deactivate this category?');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+                        </form>
+                    }
+                    else
+                    {
+                        <form asp-action="CategoryActivate" asp-route-id="@c.Id" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-success">Reactivate</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>

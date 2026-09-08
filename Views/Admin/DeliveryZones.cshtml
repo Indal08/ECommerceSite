@@ -1,0 +1,64 @@
+@model List<DeliveryZone>
+@{
+    ViewData["Title"] = "Delivery Zones";
+    Layout = "_AdminLayout";
+}
+
+<h2 class="mb-4">Delivery Zones</h2>
+
+<form asp-action="DeliveryZoneCreate" method="post" class="row g-3 mb-4">
+    @Html.AntiForgeryToken()
+    <div class="col-md-3">
+        <label class="form-label">Zone Name</label>
+        <input type="text" name="Name" class="form-control" required />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Min Km</label>
+        <input type="number" name="MinDistanceKm" class="form-control" step="0.01" min="0" required />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Max Km</label>
+        <input type="number" name="MaxDistanceKm" class="form-control" step="0.01" min="0" required />
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Charge</label>
+        <input type="number" name="DeliveryCharge" class="form-control" step="0.01" min="0" required />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary w-100">Add Zone</button>
+    </div>
+</form>
+
+@if (!Model.Any())
+{
+    <p>No delivery zones configured.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr><th>Name</th><th>Distance</th><th>Delivery Charge</th><th>Active</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var zone in Model)
+                {
+                    <tr>
+                        <td>@zone.Name</td>
+                        <td>@zone.MinDistanceKm km - @zone.MaxDistanceKm km</td>
+                        <td>Rs. @zone.DeliveryCharge</td>
+                        <td>@(zone.IsActive ? "Yes" : "No")</td>
+                        <td>
+                            <form asp-action="DeliveryZoneDelete" asp-route-id="@zone.Id" method="post" onsubmit="return confirm('Delete this delivery zone?');">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<a asp-action="Settings" class="btn btn-outline-secondary">Back to Settings</a>

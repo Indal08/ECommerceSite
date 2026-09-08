@@ -1,0 +1,46 @@
+@model Product
+@{
+    ViewData["Title"] = "Edit Product";
+    Layout = "_AdminLayout";
+    var categories = ViewBag.Categories as List<Category>;
+}
+
+<h2 class="mb-4">Edit Product</h2>
+
+<form asp-action="ProductEdit" method="post">
+    <input type="hidden" asp-for="Id" />
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <div class="mb-3">
+        <label asp-for="Name" class="form-label"></label>
+        <input asp-for="Name" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="Description" class="form-label"></label>
+        <textarea asp-for="Description" class="form-control"></textarea>
+    </div>
+    <div class="mb-3">
+        <label asp-for="PricePerKg" class="form-label">Price per KG</label>
+        <input asp-for="PricePerKg" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="ImageUrl" class="form-label">Image URL</label>
+        <input asp-for="ImageUrl" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label asp-for="CategoryId" class="form-label">Category</label>
+        <select asp-for="CategoryId" class="form-select">
+            @if (categories != null)
+            {
+                foreach (var c in categories)
+                {
+                    <option value="@c.Id" selected="@(c.Id == Model.CategoryId)">@c.Name</option>
+                }
+            }
+        </select>
+    </div>
+    <div class="mb-3 form-check">
+        <input asp-for="IsAvailable" class="form-check-input" />
+        <label asp-for="IsAvailable" class="form-check-label"></label>
+    </div>
+    <button type="submit" class="btn btn-primary">Update</button>
+</form>

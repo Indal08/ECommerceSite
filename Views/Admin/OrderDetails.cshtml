@@ -1,0 +1,219 @@
+@model Order
+@{
+    ViewData["Title"] = "Order " + Model.OrderNumber;
+    Layout = "_AdminLayout";
+    var whatsappNumber = System.Text.RegularExpressions.Regex.Replace(Model.ContactPhone, @"[^\d]", "");
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div>
+        <div class="eyebrow">Order</div>
+        <h2 class="mb-0">@Model.OrderNumber</h2>
+    </div>
+    <span id="current-order-status" class="status-badge status-@Model.Status.ToString().ToLowerInvariant()">@Model.Status</span>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="admin-mini-card h-100">
+            <span class="text-muted small text-uppercase fw-semibold">Placed</span>
+            <h6 class="mt-2 mb-0">@Model.CreatedAt.ToString("dd MMM yyyy")</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-mini-card h-100">
+            <span class="text-muted small text-uppercase fw-semibold">Total</span>
+            <h6 class="mt-2 mb-0">Rs. @Model.TotalAmount</h6>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-mini-card h-100">
+            <span class="text-muted small text-uppercase fw-semibold">Payment</span>
+            <div class="mt-2"><span id="payment-status-badge" class="badge bg-@(Model.PaymentStatus == PaymentStatus.Paid ? "success" : "secondary")">@Model.PaymentStatus</span></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="admin-mini-card h-100">
+            <span class="text-muted small text-uppercase fw-semibold">Method</span>
+            <h6 class="mt-2 mb-0">@Model.PaymentMethod</h6>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4 g-3">
+    <div class="col-md-7">
+        <div class="admin-panel-card h-100">
+            <h5>Customer</h5>
+            <p class="mb-1"><strong>@Model.CustomerName</strong></p>
+            <p class="mb-1">@Model.ContactPhone</p>
+            <div class="d-flex gap-2 mb-3">
+                <a class="btn btn-sm btn-success" href="tel:@Model.ContactPhone">📞 Call Customer</a>
+                <a class="btn btn-sm btn-outline-success" href="https://wa.me/@whatsappNumber" target="_blank" rel="noopener">💬 WhatsApp</a>
+            </div>
+            <h5>Delivery</h5>
+            <p class="mb-1">@Model.DeliveryAddress</p>
+            <p class="mb-1">Landmark: @Model.Landmark</p>
+            @if (!string.IsNullOrEmpty(Model.DeliveryInstructions))
+            {
+                <p class="mb-1">Instructions: @Model.DeliveryInstructions</p>
+            }
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="admin-panel-card h-100">
+            <h5>Payment & status</h5>
+            <div class="mb-3">
+                <small class="text-muted d-block">Payment status</small>
+                <span id="payment-status-badge-2" class="badge bg-@(Model.PaymentStatus == PaymentStatus.Paid ? "success" : "secondary")">@Model.PaymentStatus</span>
+            </div>
+            @if (Model.PaymentStatus != PaymentStatus.Paid && Model.Status == OrderStatus.Accepted)
+            {
+                <form asp-action="MarkPaymentReceived" asp-route-id="@Model.Id" method="post" class="d-inline js-payment-received">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-sm btn-success">✅ Payment Received & Delivered</button>
+                </form>
+            }
+            <p class="mb-0 mt-3"><strong>Placed:</strong> @Model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</p>
+            <p class="mb-0 mt-2"><strong>Last updated:</strong> @Model.UpdatedAt.ToString("dd MMM yyyy, hh:mm tt")</p>
+            @if (Model.Status == OrderStatus.Delivered)
+            {
+                <p class="text-success small fw-semibold mt-2 mb-0">Cash collected and delivery completed.</p>
+            }
+            else if (Model.Status == OrderStatus.Accepted)
+            {
+                <p class="text-warning small fw-semibold mt-2 mb-0">Cash collection and delivery happen together on handover.</p>
+            }
+        </div>
+    </div>
+</div>
+
+<div class="admin-panel-card mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="mb-0">Order Items</h5>
+        <strong>Total: Rs. @Model.TotalAmount</strong>
+    </div>
+    <div class="table-responsive">
+        <table class="table admin-order-table mb-0">
+            <thead><tr><th>Product</th><th>Qty (KG)</th><th>Unit Price</th><th>Subtotal</th></tr></thead>
+            <tbody>
+                @foreach (var item in Model.OrderItems)
+                {
+                    <tr>
+                        <td>@item.Product?.Name</td>
+                        <td>@item.Quantity</td>
+                        <td>Rs. @item.UnitPrice</td>
+                        <td>Rs. @item.TotalPrice</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="admin-panel-card" style="max-width: 460px;">
+    <h5 class="mb-3">Order Actions</h5>
+    @if (Model.Status == OrderStatus.NewOrder)
+    {
+        <div class="d-flex gap-2 flex-wrap">
+            <form asp-action="AcceptOrder" asp-route-id="@Model.Id" method="post" class="js-order-action">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-primary">Accept</button>
+            </form>
+            <form asp-action="RejectOrder" asp-route-id="@Model.Id" method="post" class="js-order-action">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-danger">Reject</button>
+            </form>
+        </div>
+    }
+    else if (Model.Status == OrderStatus.Accepted && Model.PaymentStatus == PaymentStatus.Paid)
+    {
+        <form asp-action="MarkOrderDelivered" asp-route-id="@Model.Id" method="post" class="js-order-action">
+            @Html.AntiForgeryToken()
+            <button type="submit" class="btn btn-success">Mark as Delivered</button>
+        </form>
+    }
+    else
+    {
+        <p class="mb-0 text-muted">This order is already finished.</p>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const submitJson = async (form, callback) => {
+                const formData = new FormData(form);
+                const token = form.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    },
+                    body: new URLSearchParams(formData).toString()
+                });
+
+                const data = await response.json();
+                if (callback) callback(data);
+            };
+
+            document.querySelectorAll('.js-order-action').forEach(form => {
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    const button = form.querySelector('button[type="submit"]');
+                    if (button) button.disabled = true;
+                    await submitJson(form, function (data) {
+                        if (data.success) {
+                            const badge = document.getElementById('current-order-status');
+                            if (badge && data.status) {
+                                badge.textContent = data.status;
+                                badge.className = 'status-badge status-' + data.status.toLowerCase();
+                            }
+                            alert(data.message || 'Order updated successfully.');
+                            window.location.reload();
+                        } else if (data.message) {
+                            alert(data.message);
+                            if (button) button.disabled = false;
+                        }
+                    });
+                });
+            });
+
+            document.querySelectorAll('.js-payment-received').forEach(form => {
+                form.addEventListener('submit', async function (event) {
+                    event.preventDefault();
+                    const button = form.querySelector('button[type="submit"]');
+                    if (button) button.disabled = true;
+                    await submitJson(form, function (data) {
+                        if (data.success) {
+                            const badge = document.getElementById('payment-status-badge');
+                            const badge2 = document.getElementById('payment-status-badge-2');
+                            const statusBadge = document.getElementById('current-order-status');
+
+                            if (badge) {
+                                badge.textContent = data.paymentStatus;
+                                badge.className = 'badge bg-success';
+                            }
+                            if (badge2) {
+                                badge2.textContent = data.paymentStatus;
+                                badge2.className = 'badge bg-success';
+                            }
+                            if (statusBadge && data.status) {
+                                statusBadge.textContent = data.status;
+                                statusBadge.className = 'status-badge status-' + data.status.toLowerCase();
+                            }
+                            if (data.message) {
+                                alert(data.message);
+                            }
+                            form.remove();
+                        } else if (data.message) {
+                            alert(data.message);
+                            if (button) button.disabled = false;
+                        }
+                    });
+                });
+            });
+        });
+    </script>
+}

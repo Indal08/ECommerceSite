@@ -1,0 +1,184 @@
+@model List<Product>
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+@{
+    ViewData["Title"] = "Fresh Pork Delivered Locally";
+    var categories = ViewBag.Categories as List<Category>;
+    var selectedCategoryId = ViewBag.SelectedCategoryId as int?;
+    var bizTagline = Configuration["Business:Tagline"] ?? "Fresh Pork, Arranged & Delivered Locally";
+    var phone = Configuration["Business:Phone"] ?? "";
+    var whatsapp = Configuration["Business:WhatsApp"] ?? "";
+    var serviceArea = Configuration["Business:ServiceArea"] ?? "";
+    var hours = Configuration["Business:Hours"] ?? "";
+    var address = Configuration["Business:Address"] ?? "";
+}
+
+<section class="hero-section">
+    <div class="hero-copy">
+        <span class="eyebrow">Local &middot; Fresh &middot; Made to Order</span>
+        <h1>@bizTagline</h1>
+        <p class="lead">No freezer full of stock sitting around &mdash; we arrange your cut fresh from the local shop only after you order, pack it hygienically, and bring it to your door.</p>
+        <a class="btn btn-success btn-lg mt-2" href="#products">Order Now</a>
+        <div class="trust-badges">
+            <span class="trust-badge">🥩 Arranged Fresh on Order</span>
+            <span class="trust-badge">✅ Hygienically Packed</span>
+            <span class="trust-badge">🚚 Local Delivery Only</span>
+        </div>
+    </div>
+    <div class="hero-graphic">
+        <svg class="cuts-wheel" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="100" cy="100" r="88" fill="none" stroke="#c9a25d" stroke-width="1.5" opacity="0.6" />
+            <circle cx="100" cy="100" r="60" fill="none" stroke="#c9a25d" stroke-width="1" stroke-dasharray="4 5" opacity="0.5" />
+            @{
+                var angles = new[] { 0, 72, 144, 216, 288 };
+            }
+            @foreach (var a in angles)
+            {
+                var rad = a * Math.PI / 180;
+                var x2 = 100 + 88 * Math.Cos(rad);
+                var y2 = 100 + 88 * Math.Sin(rad);
+                var dx = 100 + 40 * Math.Cos(rad);
+                var dy = 100 + 40 * Math.Sin(rad);
+                <line x1="100" y1="100" x2="@x2.ToString("0.0")" y2="@y2.ToString("0.0")" stroke="#c9a25d" stroke-width="1" stroke-dasharray="3 4" opacity="0.7" />
+                <circle cx="@dx.ToString("0.0")" cy="@dy.ToString("0.0")" r="3" fill="#c9a25d" />
+            }
+            <circle cx="100" cy="100" r="5" fill="#c9a25d" />
+        </svg>
+    </div>
+</section>
+
+<section class="how-it-works">
+    <div class="text-center mb-4">
+        <span class="eyebrow">How It Works</span>
+        <h2>From Order to Doorstep</h2>
+    </div>
+    <div class="row g-3">
+        <div class="col-6 col-md-3">
+            <div class="step-card">
+                <div class="step-number">01</div>
+                <h6>Choose Your Meat</h6>
+                <p class="small text-muted mb-0">Pick the cut and the quantity you need, in KG.</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="step-card">
+                <div class="step-number">02</div>
+                <h6>Place Your Order</h6>
+                <p class="small text-muted mb-0">Share your phone number and delivery address.</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="step-card">
+                <div class="step-number">03</div>
+                <h6>We Prepare It</h6>
+                <p class="small text-muted mb-0">We confirm, arrange it fresh, and pack it hygienically.</p>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="step-card">
+                <div class="step-number">04</div>
+                <h6>Local Delivery</h6>
+                <p class="small text-muted mb-0">Your order is delivered straight to your address.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section id="products">
+    <div class="text-center mb-4">
+        <span class="eyebrow">Our Products</span>
+        <h2>Available on Order</h2>
+    </div>
+
+    <div class="mb-4 category-pills d-flex gap-2 flex-wrap justify-content-center">
+                <a class="btn btn-sm category-filter @(selectedCategoryId == null ? "btn-primary" : "btn-outline-primary")" data-category-id="" asp-action="Index">All</a>
+        @if (categories != null)
+        {
+            foreach (var c in categories)
+            {
+                <a class="btn btn-sm category-filter @(selectedCategoryId == c.Id ? "btn-primary" : "btn-outline-primary")" data-category-id="@c.Id" asp-action="Index" asp-route-categoryId="@c.Id">@c.Name</a>
+            }
+        }
+    </div>
+
+    <div id="product-grid">
+        <partial name="_ProductGrid" model="Model" />
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const grid = document.getElementById('product-grid');
+            const filters = document.querySelectorAll('.category-filter');
+
+            filters.forEach(filter => {
+                filter.addEventListener('click', async function (event) {
+                    event.preventDefault();
+                    const categoryId = filter.dataset.categoryId;
+                    const url = '@Url.Action("Index", "Home")' + (categoryId ? `?categoryId=${encodeURIComponent(categoryId)}&partial=true` : '?partial=true');
+                    filters.forEach(item => {
+                        item.classList.toggle('btn-primary', item === filter);
+                        item.classList.toggle('btn-outline-primary', item !== filter);
+                    });
+
+                    filter.disabled = true;
+                    try {
+                        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                        if (!response.ok) throw new Error('Unable to load products.');
+                        grid.innerHTML = await response.text();
+                        window.history.replaceState({}, '', categoryId ? `/?categoryId=${encodeURIComponent(categoryId)}` : '/');
+                    } catch (error) {
+                        window.alert(error.message);
+                    } finally {
+                        filter.disabled = false;
+                    }
+                });
+            });
+        });
+    </script>
+}
+
+<section class="info-section">
+    <span class="eyebrow">Delivery Area</span>
+    <h3 class="mb-3">We Deliver Locally</h3>
+    <p class="mb-0">@serviceArea. Share your full address and a nearby landmark at checkout &mdash; we'll confirm your order once it's arranged.</p>
+</section>
+
+<section class="info-section">
+    <span class="eyebrow">Get In Touch</span>
+    <h3 class="mb-3">Contact Us</h3>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="contact-row">
+                <div class="contact-icon">📞</div>
+                <div>
+                    <div class="fw-semibold">Call</div>
+                    <a href="tel:@phone">@phone</a>
+                </div>
+            </div>
+            <div class="contact-row">
+                <div class="contact-icon">💬</div>
+                <div>
+                    <div class="fw-semibold">WhatsApp</div>
+                    <a href="https://wa.me/@whatsapp" target="_blank" rel="noopener">Message us on WhatsApp</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="contact-row">
+                <div class="contact-icon">🕒</div>
+                <div>
+                    <div class="fw-semibold">Hours</div>
+                    <div>@hours</div>
+                </div>
+            </div>
+            <div class="contact-row">
+                <div class="contact-icon">📍</div>
+                <div>
+                    <div class="fw-semibold">Area</div>
+                    <div>@address</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

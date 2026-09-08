@@ -1,0 +1,99 @@
+@model BusinessSettings
+@{
+    ViewData["Title"] = "Settings";
+    Layout = "_AdminLayout";
+    var zones = ViewBag.DeliveryZones as List<DeliveryZone> ?? new List<DeliveryZone>();
+}
+
+<h2 class="mb-4">Business Settings</h2>
+
+<form asp-action="Settings" method="post" class="row g-3">
+    @Html.AntiForgeryToken()
+    <div class="col-md-6">
+        <label asp-for="BusinessName" class="form-label"></label>
+        <input asp-for="BusinessName" class="form-control" />
+    </div>
+    <div class="col-md-3">
+        <label asp-for="Phone" class="form-label"></label>
+        <input asp-for="Phone" class="form-control" />
+    </div>
+    <div class="col-md-3">
+        <label asp-for="WhatsApp" class="form-label"></label>
+        <input asp-for="WhatsApp" class="form-control" />
+    </div>
+    <div class="col-md-12">
+        <label asp-for="Address" class="form-label"></label>
+        <textarea asp-for="Address" class="form-control" rows="3"></textarea>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="ServiceArea" class="form-label"></label>
+        <input asp-for="ServiceArea" class="form-control" />
+    </div>
+    <div class="col-md-6">
+        <label asp-for="BusinessHours" class="form-label"></label>
+        <input asp-for="BusinessHours" class="form-control" />
+    </div>
+
+    <div class="col-md-4">
+        <label asp-for="MinimumOrderValue" class="form-label"></label>
+        <input asp-for="MinimumOrderValue" class="form-control" type="number" step="0.01" min="0" />
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+        <div class="form-check form-switch">
+            <input asp-for="MinimumOrderEnabled" class="form-check-input" />
+            <label asp-for="MinimumOrderEnabled" class="form-check-label">Enable minimum order</label>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="FreeDeliveryThreshold" class="form-label"></label>
+        <input asp-for="FreeDeliveryThreshold" class="form-control" type="number" step="0.01" min="0" />
+    </div>
+
+    <div class="col-md-6 d-flex align-items-end">
+        <div class="form-check form-switch">
+            <input asp-for="FreeDeliveryEnabled" class="form-check-input" />
+            <label asp-for="FreeDeliveryEnabled" class="form-check-label">Enable free delivery threshold</label>
+        </div>
+    </div>
+    <div class="col-md-6 d-flex align-items-end">
+        <div class="form-check form-switch">
+            <input asp-for="CashOnDeliveryEnabled" class="form-check-input" />
+            <label asp-for="CashOnDeliveryEnabled" class="form-check-label">Enable cash on delivery</label>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
+</form>
+
+<hr class="my-4" />
+
+<h3 class="mb-3">Delivery Zones</h3>
+@if (!zones.Any())
+{
+    <p class="text-muted">No delivery zones configured yet.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <thead>
+                <tr><th>Name</th><th>Distance</th><th>Charge</th><th>Active</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var zone in zones)
+                {
+                    <tr>
+                        <td>@zone.Name</td>
+                        <td>@zone.MinDistanceKm km - @zone.MaxDistanceKm km</td>
+                        <td>Rs. @zone.DeliveryCharge</td>
+                        <td>@(zone.IsActive ? "Yes" : "No")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<a asp-action="DeliveryZones" class="btn btn-outline-primary">Manage Zones</a>

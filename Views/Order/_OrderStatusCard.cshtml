@@ -1,0 +1,33 @@
+@model Order
+
+<div class="info-section">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="mb-0">Order details</h5>
+        <span class="status-badge status-@Model.Status.ToString().ToLowerInvariant()">@Model.Status</span>
+    </div>
+
+    <h6>Ordered Products</h6>
+    <ul class="list-group list-group-flush mb-3">
+        @foreach (var item in Model.OrderItems)
+        {
+            <li class="list-group-item d-flex justify-content-between px-0">
+                <span>@item.Product?.Name x @item.Quantity KG</span>
+                <span>Rs. @item.TotalPrice</span>
+            </li>
+        }
+    </ul>
+    <div class="d-flex justify-content-between fw-bold border-top pt-2 mb-4">
+        <span>Total</span>
+        <span class="price-tag">Rs. @Model.TotalAmount</span>
+    </div>
+
+    <h6>Delivery Information</h6>
+    <p class="mb-1">@Model.CustomerName</p>
+    <p class="mb-1">@Model.ContactPhone</p>
+    <p class="mb-3">@Model.DeliveryAddress, near @Model.Landmark</p>
+
+    <p class="mb-0">Payment: Cash on Delivery
+        <span class="badge bg-@(Model.PaymentStatus == PaymentStatus.Paid ? "success" : "secondary") ms-1">@Model.PaymentStatus</span>
+    </p>
+    <p class="mb-0 text-muted small">Order placed: @Model.CreatedAt.ToString("dd MMM yyyy, hh:mm tt")</p>
+</div>

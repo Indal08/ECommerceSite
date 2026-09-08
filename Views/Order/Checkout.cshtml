@@ -1,0 +1,113 @@
+@model CheckoutViewModel
+@{
+    ViewData["Title"] = "Checkout";
+}
+
+<span class="eyebrow">Almost There</span>
+<h2 class="mb-4">Checkout</h2>
+
+<div class="row">
+    <div class="col-md-7">
+        <div class="info-section">
+            <form asp-action="Checkout" method="post" id="checkout-form">
+                <div asp-validation-summary="All" class="text-danger"></div>
+                <div class="mb-3">
+                    <label asp-for="CustomerName" class="form-label"></label>
+                    <input asp-for="CustomerName" class="form-control" />
+                    <span asp-validation-for="CustomerName" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="ContactPhone" class="form-label"></label>
+                    <input asp-for="ContactPhone" class="form-control" />
+                    <span asp-validation-for="ContactPhone" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="DeliveryAddress" class="form-label"></label>
+                    <textarea asp-for="DeliveryAddress" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="DeliveryAddress" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="Landmark" class="form-label"></label>
+                    <input asp-for="Landmark" class="form-control" />
+                    <span asp-validation-for="Landmark" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="DeliveryZoneId" class="form-label">Delivery Zone</label>
+                    <select asp-for="DeliveryZoneId" class="form-select" id="deliveryZoneSelect">
+                        @foreach (var zone in Model.DeliveryZones)
+                        {
+                            <option value="@zone.Id">@zone.Name - Rs. @zone.DeliveryCharge</option>
+                        }
+                    </select>
+                    <span asp-validation-for="DeliveryZoneId" class="text-danger"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="DeliveryInstructions" class="form-label">Delivery Instructions (optional)</label>
+                    <textarea asp-for="DeliveryInstructions" class="form-control" rows="2"></textarea>
+                </div>
+                <div class="mb-3">
+                    <div class="alert alert-secondary mb-0">Payment Method: <strong>Cash on Delivery</strong></div>
+                </div>
+                <button type="submit" class="btn btn-success btn-lg">Place Order</button>
+            </form>
+        </div>
+    </div>
+    <div class="col-md-5">
+        <div class="info-section">
+            <h5>Order Summary</h5>
+            <ul class="list-group list-group-flush mb-2">
+                @foreach (var item in Model.CartItems)
+                {
+                    <li class="list-group-item d-flex justify-content-between px-0">
+                        <span>@item.Product?.Name x @item.Quantity KG</span>
+                        <span>Rs. @(item.Product != null ? item.Product.PricePerKg * item.Quantity : 0)</span>
+                    </li>
+                }
+            </ul>
+            <div class="d-flex justify-content-between"><span>Subtotal</span><span id="summary-subtotal">Rs. @Model.SubTotal</span></div>
+            <div class="d-flex justify-content-between"><span>Delivery</span><span id="summary-delivery">Rs. @Model.DeliveryCharge</span></div>
+            <div class="d-flex justify-content-between fw-bold border-top pt-2">
+                <span>Total</span>
+                <span class="price-tag" id="summary-total">Rs. @Model.TotalAmount</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const zoneSelect = document.getElementById('deliveryZoneSelect');
+            const subtotalEl = document.getElementById('summary-subtotal');
+            const deliveryEl = document.getElementById('summary-delivery');
+            const totalEl = document.getElementById('summary-total');
+
+            if (!zoneSelect || !subtotalEl || !deliveryEl || !totalEl) return;
+
+            const refreshSummary = async () => {
+                const form = document.getElementById('checkout-form');
+                const token = form?.querySelector('input[name="__RequestVerificationToken"]')?.value || '';
+                const response = await fetch('/Order/DeliverySummary', {
+                    method: 'POST',
+                    headers: {
+                        'RequestVerificationToken': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'Accept': 'application/json'
+                    },
+                    body: new URLSearchParams({ deliveryZoneId: zoneSelect.value }).toString()
+                });
+
+                const data = await response.json();
+                if (!data.success) return;
+
+                subtotalEl.textContent = 'Rs. ' + Number(data.subtotal).toFixed(2);
+                deliveryEl.textContent = 'Rs. ' + Number(data.deliveryCharge).toFixed(2);
+                totalEl.textContent = 'Rs. ' + Number(data.totalAmount).toFixed(2);
+            };
+
+            zoneSelect.addEventListener('change', refreshSummary);
+            refreshSummary();
+        });
+    </script>
+}

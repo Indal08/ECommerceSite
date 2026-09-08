@@ -1,0 +1,148 @@
+@model AdminDashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "_AdminLayout";
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <div>
+        <div class="eyebrow">Overview</div>
+        <h2 class="mb-0">Dashboard</h2>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Orders" class="btn btn-primary">Open Orders</a>
+        <a asp-action="Products" class="btn btn-outline-primary">Manage Products</a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="admin-metric-card border-primary">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small text-uppercase fw-semibold">Today</span>
+                <span class="badge bg-primary-subtle text-primary">Orders</span>
+            </div>
+            <h2 class="mb-0">@Model.TodayOrdersCount</h2>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="admin-metric-card border-warning">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small text-uppercase fw-semibold">New</span>
+                <span class="badge bg-warning-subtle text-warning-emphasis">Live</span>
+            </div>
+            <h2 id="dashboard-new-orders" class="mb-0">@Model.NewOrdersCount</h2>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="admin-metric-card border-info">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small text-uppercase fw-semibold">Accepted</span>
+                <span class="badge bg-info-subtle text-info-emphasis">In progress</span>
+            </div>
+            <h2 id="dashboard-accepted-orders" class="mb-0">@Model.AcceptedOrdersCount</h2>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="admin-metric-card border-success">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small text-uppercase fw-semibold">Sales</span>
+                <span class="badge bg-success-subtle text-success-emphasis">Today</span>
+            </div>
+            <h2 class="mb-0">Rs. @Model.TodaySales</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4">
+        <div class="admin-mini-card">
+            <span class="text-muted small text-uppercase fw-semibold">Delivered</span>
+            <h3 id="dashboard-delivered-orders">@Model.DeliveredOrdersCount</h3>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="admin-mini-card">
+            <span class="text-muted small text-uppercase fw-semibold">Cancelled</span>
+            <h3>@Model.CancelledOrdersCount</h3>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="admin-mini-card">
+            <span class="text-muted small text-uppercase fw-semibold">Today</span>
+            <h3>@Model.TodayOrdersCount</h3>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const refreshCounts = async () => {
+                try {
+                    const response = await fetch('@Url.Action("DashboardCounts", "Admin")', {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                        cache: 'no-store'
+                    });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    document.getElementById('dashboard-new-orders').textContent = data.newOrders;
+                    document.getElementById('dashboard-accepted-orders').textContent = data.accepted;
+                    document.getElementById('dashboard-delivered-orders').textContent = data.delivered;
+                } catch (error) {
+                    // Keep the dashboard usable if a background refresh is temporarily unavailable.
+                }
+            };
+
+            window.setInterval(refreshCounts, 30000);
+        });
+    </script>
+}
+
+@if (Model.NewOrdersCount > 0)
+{
+    <div class="alert alert-warning d-flex align-items-center justify-content-between gap-3 flex-wrap mb-4">
+        <span>You have @Model.NewOrdersCount new order(s) waiting to be accepted.</span>
+        <a asp-action="Orders" class="alert-link">Review queue</a>
+    </div>
+}
+
+<div class="admin-panel-card">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="mb-0">Recent Orders</h5>
+        <a asp-action="Orders" class="btn btn-sm btn-outline-secondary">View All</a>
+    </div>
+
+    @if (!Model.RecentOrders.Any())
+    {
+        <p class="text-muted mb-0">No orders yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table admin-order-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Order #</th>
+                        <th>Customer</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var order in Model.RecentOrders)
+                    {
+                        <tr class="@(order.Status == OrderStatus.NewOrder ? "table-warning" : "")">
+                            <td>@order.OrderNumber</td>
+                            <td>@order.CustomerName</td>
+                            <td>Rs. @order.TotalAmount</td>
+                            <td><span class="status-badge status-@order.Status.ToString().ToLowerInvariant()">@order.Status</span></td>
+                            <td class="text-end"><a class="btn btn-sm btn-outline-primary" asp-action="OrderDetails" asp-route-id="@order.Id">View</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
