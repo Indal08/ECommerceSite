@@ -113,7 +113,7 @@ using (var scope = app.Services.CreateScope())
     if (!await roleManager.RoleExistsAsync("Customer"))
         await roleManager.CreateAsync(new IdentityRole("Customer"));
 
-    var adminEmail = (builder.Configuration["Seed:AdminEmail"] ?? "admin@yourdomain.com").Trim();
+    var adminEmail = (builder.Configuration["Seed:AdminEmail"] ?? "siddhujatv@gmail.com").Trim();
     var adminPassword = (builder.Configuration["Seed:AdminPassword"] ?? "AdminPass123!").Trim();
 
     if (string.IsNullOrWhiteSpace(adminEmail))
@@ -161,8 +161,8 @@ using (var scope = app.Services.CreateScope())
         context.BusinessSettings.Add(new BusinessSettings
         {
             BusinessName = builder.Configuration["Business:Name"] ?? "Local Pork Delivery",
-            Phone = builder.Configuration["Business:Phone"] ?? "+91-XXXXXXXXXX",
-            WhatsApp = builder.Configuration["Business:WhatsApp"] ?? "91XXXXXXXXXX",
+            Phone = builder.Configuration["Business:Phone"] ?? "6391395571",
+            WhatsApp = builder.Configuration["Business:WhatsApp"] ?? "916391395571",
             ServiceArea = builder.Configuration["Business:ServiceArea"] ?? "Local delivery within service area",
             Address = builder.Configuration["Business:Address"] ?? "Service area only",
             BusinessHours = builder.Configuration["Business:Hours"] ?? "Mon-Sun, 9AM-8PM",
