@@ -7,22 +7,36 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
-var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+if (string.IsNullOrWhiteSpace(databaseUrl))
+    throw new InvalidOperationException("DATABASE_URL environment variable is required and must contain a Railway PostgreSQL connection URL.");
 
-if (Uri.TryCreate(defaultConnection, UriKind.Absolute, out var databaseUri)
-    && (databaseUri.Scheme.Equals("postgres", StringComparison.OrdinalIgnoreCase)
-        || databaseUri.Scheme.Equals("postgresql", StringComparison.OrdinalIgnoreCase)))
+Uri databaseUri;
+try
 {
-    var userInfo = databaseUri.UserInfo.Split(':', 2);
-    defaultConnection = new NpgsqlConnectionStringBuilder
-    {
-        Host = databaseUri.Host,
-        Port = databaseUri.Port > 0 ? databaseUri.Port : 5432,
-        Database = databaseUri.AbsolutePath.Trim('/'),
-        Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty,
-        Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty
-    }.ConnectionString;
+    databaseUri = new Uri(databaseUrl, UriKind.Absolute);
 }
+catch (UriFormatException ex)
+{
+    throw new InvalidOperationException("DATABASE_URL must be a valid PostgreSQL URL such as postgresql://user:password@host:5432/database.", ex);
+}
+
+if (!databaseUri.Scheme.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+    && !databaseUri.Scheme.Equals("postgresql", StringComparison.OrdinalIgnoreCase))
+    throw new InvalidOperationException("DATABASE_URL must use the postgres:// or postgresql:// scheme.");
+
+var userInfo = databaseUri.UserInfo.Split(':', 2);
+if (userInfo.Length != 2 || string.IsNullOrWhiteSpace(databaseUri.Host) || string.IsNullOrWhiteSpace(databaseUri.AbsolutePath.Trim('/')))
+    throw new InvalidOperationException("DATABASE_URL must include a username, password, host, and database name.");
+
+var defaultConnection = new NpgsqlConnectionStringBuilder
+{
+    Host = databaseUri.Host,
+    Port = databaseUri.Port > 0 ? databaseUri.Port : 5432,
+    Database = databaseUri.AbsolutePath.Trim('/'),
+    Username = Uri.UnescapeDataString(userInfo[0]),
+    Password = Uri.UnescapeDataString(userInfo[1])
+}.ConnectionString + ";SSL Mode=Require;Trust Server Certificate=true";
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(defaultConnection));
@@ -67,23 +81,8 @@ builder.Services.AddSession(options =>
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-app.UseRouting();
-app.UseSession();
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+var port = Environment.GetEnvironmentVariable("PORT");
+app.Urls.Add($"http://0.0.0.0:{(string.IsNullOrWhiteSpace(port) ? "8080" : port)}");
 
 using (var scope = app.Services.CreateScope())
 {
@@ -167,7 +166,22 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://0.0.0.0:{port}");
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseRouting();
+app.UseSession();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
