@@ -4,11 +4,28 @@ using ECommerceSite.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+
+if (Uri.TryCreate(defaultConnection, UriKind.Absolute, out var databaseUri)
+    && (databaseUri.Scheme.Equals("postgres", StringComparison.OrdinalIgnoreCase)
+        || databaseUri.Scheme.Equals("postgresql", StringComparison.OrdinalIgnoreCase)))
+{
+    var userInfo = databaseUri.UserInfo.Split(':', 2);
+    defaultConnection = new NpgsqlConnectionStringBuilder
+    {
+        Host = databaseUri.Host,
+        Port = databaseUri.Port > 0 ? databaseUri.Port : 5432,
+        Database = databaseUri.AbsolutePath.Trim('/'),
+        Username = userInfo.Length > 0 ? Uri.UnescapeDataString(userInfo[0]) : string.Empty,
+        Password = userInfo.Length > 1 ? Uri.UnescapeDataString(userInfo[1]) : string.Empty
+    }.ConnectionString;
+}
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(defaultConnection));
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
